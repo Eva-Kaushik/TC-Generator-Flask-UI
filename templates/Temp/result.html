@@ -1,0 +1,122 @@
+from flask import Flask, render_template, request, jsonify, send_file
+import pandas as pd
+import openai
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        data = request.get_json()
+        user_story = data.get("user_story", "")
+        acceptance_criteria = data.get("acceptance_criteria", "")
+        
+        if not user_story or not acceptance_criteria:
+            return jsonify({"error": "User Story and Acceptance Criteria are required"}), 400
+        
+        response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=f"User Story:\n{user_story}\nAcceptance Criteria:\n{acceptance_criteria}",
+            max_tokens=500
+        )
+
+        prediction = response.choices[0].text.strip()
+
+        return render_template('result.html', user_story=user_story, acceptance_criteria=acceptance_criteria, prediction=prediction)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/generate_test_cases', methods=['POST'])
+def generate_test_cases():
+    try:
+        data = request.get_json()
+        user_story = data.get("user_story", "")
+        acceptance_criteria = data.get("acceptance_criteria", "")
+        
+        if not user_story or not acceptance_criteria:
+            return jsonify({"error": "User Story and Acceptance Criteria are required"}), 400
+        
+        response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=f"Generate test cases based on the following User Story and Acceptance Criteria:\nUser Story: {user_story}\nAcceptance Criteria: {acceptance_criteria}",
+            max_tokens=500
+        )
+
+        test_cases = response.choices[0].text.strip()
+
+        test_case_data = {
+            'User Story': [user_story],
+            'Acceptance Criteria': [acceptance_criteria],
+            'Test Cases': [test_cases]
+        }
+
+        df = pd.DataFrame(test_case_data)
+        file_path = 'test_cases.xlsx'
+        df.to_excel(file_path, index=False)
+
+        return send_file(file_path, as_attachment=True)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/generate_java_bdd', methods=['POST'])
+def generate_java_bdd():
+    try:
+        # File upload processing for BDD and Java code generation
+        file = request.files['file']
+        file_path = 'uploaded_file.xlsx'
+        file.save(file_path)
+
+        df = pd.read_excel(file_path)
+
+        bdd_feature = "Feature: Generated Feature\n  Scenario: Generated Scenario"
+        java_code = "public class GeneratedJavaCode { public void test() { // Generated test } }"
+
+        bdd_file = 'generated_feature.feature'
+        java_file = 'generated_java_code.java'
+
+        with open(bdd_file, 'w') as f:
+            f.write(bdd_feature)
+        
+        with open(java_file, 'w') as f:
+            f.write(java_code)
+
+        return jsonify({
+            'feature_download_link': bdd_file,
+            'glue_download_link': java_file
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/download', methods=['GET'])
+def download():
+    try:
+        prediction_data = {
+            'User Story': ['Generated Story'],
+            'Acceptance Criteria': ['Generated Criteria'],
+            'Prediction': ['Generated Result']
+        }
+
+        df = pd.DataFrame(prediction_data)
+        file_path = 'prediction_result.xlsx'
+        df.to_excel(file_path, index=False)
+
+        return send_file(file_path, as_attachment=True)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)

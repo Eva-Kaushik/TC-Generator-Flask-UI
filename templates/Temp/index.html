@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Case & BDD Generator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Test Case and BDD Generator</h2>
+        <form id="test-case-form" action="/generate_test_cases" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="optionSelector">Choose an Option</label>
+                <select class="form-control" id="optionSelector" name="option" required>
+                    <option value="1">Generate Test Cases</option>
+                    <option value="2">Generate BDD Features and Java Code</option>
+                </select>
+            </div>
+            
+            <!-- Option 1: User Story and Acceptance Criteria -->
+            <div id="test-case-input" class="option-section">
+                <div class="form-group">
+                    <label for="user_story">User Story</label>
+                    <textarea class="form-control" id="user_story" name="user_story" rows="3" placeholder="Enter User Story" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="acceptance_criteria">Acceptance Criteria</label>
+                    <textarea class="form-control" id="acceptance_criteria" name="acceptance_criteria" rows="3" placeholder="Enter Acceptance Criteria" required></textarea>
+                </div>
+            </div>
+            
+            <!-- Option 2: File Upload for Excel -->
+            <div id="file-upload" class="option-section" style="display: none;">
+                <div class="form-group">
+                    <label for="file">Upload Test Cases Excel</label>
+                    <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary" id="submitButton">Generate</button>
+        </form>
+
+        <div id="downloadLinks" class="mt-4" style="display: none;">
+            <h3>Generated Files</h3>
+            <a id="downloadTestCases" href="#" class="btn btn-success" style="display: none;">Download Test Cases</a>
+            <br><br>
+            <a id="downloadBDD" href="#" class="btn btn-info" style="display: none;">Download BDD Feature File</a>
+            <a id="downloadJava" href="#" class="btn btn-info" style="display: none;">Download Java Code</a>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Toggle sections based on the selected option
+            $('#optionSelector').change(function() {
+                var selectedOption = $(this).val();
+                
+                if (selectedOption == '1') {
+                    $('#test-case-input').show();
+                    $('#file-upload').hide();
+                } else {
+                    $('#test-case-input').hide();
+                    $('#file-upload').show();
+                }
+            });
+
+            // Submit the form and handle the result
+            $('#test-case-form').submit(function(event) {
+                event.preventDefault();
+                var selectedOption = $('#optionSelector').val();
+
+                if (selectedOption == '1') {
+                    // Option 1: Generate Test Cases
+                    var userStory = $('#user_story').val();
+                    var acceptanceCriteria = $('#acceptance_criteria').val();
+                    
+                    $.ajax({
+                        url: '/generate_test_cases',
+                        type: 'POST',
+                        data: JSON.stringify({
+                            user_story: userStory,
+                            acceptance_criteria: acceptanceCriteria,
+                            temperature: 1 
+                        }),
+                        contentType: 'application/json',
+                        success: function(response) {
+                            $('#downloadLinks').show();
+                            $('#downloadTestCases').show();
+                            $('#downloadTestCases').attr('href', response.file_download_link);
+                        },
+                        error: function() {
+                            alert('Error generating test cases.');
+                        }
+                    });
+
+                } else if (selectedOption == '2') {
+                    // Option 2: Generate BDD Features and Java Code
+                    var fileInput = $('#file')[0].files[0];
+                    
+                    var formData = new FormData();
+                    formData.append('file', fileInput);
+
+                    $.ajax({
+                        url: '/generate_java_bdd',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+                            // Display download links for BDD and Java files
+                            $('#downloadLinks').show();
+                            $('#downloadBDD').show();
+                            $('#downloadJava').show();
+                            $('#downloadBDD').attr('href', response.feature_download_link);
+                            $('#downloadJava').attr('href', response.glue_download_link);
+                        },
+                        error: function() {
+                            alert('Error generating BDD and Java files.');
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
